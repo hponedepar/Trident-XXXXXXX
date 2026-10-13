@@ -1,0 +1,2 @@
+This directory is a MARLIN project.
+stick_center left_stick_x=2220 left_stick_x_min=1325 left_stick_x_max=4095 left_stick_x_swept=1 left_stick_y=1777 left_stick_y_min=0 left_stick_y_max=3729 left_stick_y_swept=1 right_stick_x=1881 right_stick_x_min=415 right_stick_x_max=4077 right_stick_x_swept=1 right_stick_y=1845 right_stick_y_min=0 right_stick_y_max=3380 right_stick_y_swept=1 deadzone=18
