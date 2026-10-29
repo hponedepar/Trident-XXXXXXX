@@ -5,12 +5,15 @@ import time
 from pathlib import Path
 from marlin import Robot, Thruster, Servo, IMU, RadioBeacon
 
+import auton
+
 # Brain port definitions
 IMU_PORT = "S1"
 RADIOBEACON_PORT = "S6"
 ARM = "M2"
 
 # Which thruster port each joystick drives. Swap these two lines if they feel the wrong way round.
+# Auton assumes stick 1's fan is the LEFT one and stick 3's fan the RIGHT one.
 STICK1_THRUSTER = "M8"
 STICK3_THRUSTER = "M1"
 
@@ -114,6 +117,13 @@ def balance_scales(balance):
     return stick1_scale, stick3_scale
 
 
+def balanced(duty1, duty3, balance):
+    """Apply the forward or backward balance to each fan, depending on which way it pushes."""
+    stick1_scale = balance_scales(balance["forward" if duty1 >= 0 else "reverse"])[0]
+    stick3_scale = balance_scales(balance["forward" if duty3 >= 0 else "reverse"])[1]
+    return duty1 * stick1_scale, duty3 * stick3_scale
+
+
 def describe_balance(balance):
     stick1_scale, stick3_scale = balance_scales(balance)
     return f"stick 1 fan {stick1_scale:.0%}, stick 3 fan {stick3_scale:.0%}"
@@ -126,11 +136,23 @@ def initialize(robot):
     # Set Servo speed to 120 deg/s
     robot.servo(ARM).set_speed(120)
 
+    # The boat is still here: measure the gyro bias for the auton heading.
+    auton.calibrate_imu(robot, IMU_PORT)
+
 
 def autonomous(robot):
-    while robot.running:
-
-        pass
+    # Find the Beacon by radio, grab it and bring it home. Settings are at the top of auton.py.
+    balance = load_balance()
+    auton.run(
+        robot,
+        imu_port=IMU_PORT,
+        radio_port=RADIOBEACON_PORT,
+        arm_port=ARM,
+        left_port=STICK1_THRUSTER,
+        right_port=STICK3_THRUSTER,
+        balance=lambda duty1, duty3: balanced(duty1, duty3, balance),
+        ramp_step=RAMP_STEP,
+    )
 
 
 def driver(robot):
@@ -199,10 +221,7 @@ def driver(robot):
 
         power = SLOW_POWER if slow_mode else 1.0
         # Each thruster uses the forward or backward balance depending on which way it is pushing.
-        stick1_scale = balance_scales(balance["forward" if stick1 >= 0 else "reverse"])[0]
-        stick3_scale = balance_scales(balance["forward" if stick3 >= 0 else "reverse"])[1]
-        duty1 = stick1 * stick1_scale * power
-        duty3 = stick3 * stick3_scale * power
+        duty1, duty3 = balanced(stick1 * power, stick3 * power, balance)
 
         # Fan test overrides the sticks with fixed power on one fan at a time.
         if test_step is not None:
